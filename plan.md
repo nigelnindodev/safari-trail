@@ -976,6 +976,130 @@ export function RagChat() {
 
 ---
 
+## Phase 5: Observability & Tracing
+
+### Step 5.1: Langfuse Infrastructure Setup
+
+Add Langfuse to the local Docker Compose setup to provide a local UI for monitoring Agent and LLM interactions.
+
+**File:** `docker-compose.yml`
+
+Add the `langfuse` service:
+
+```yaml
+  langfuse:
+    image: langfuse/langfuse:latest
+    restart: always
+    depends_on:
+      - postgres
+    ports:
+      - "3080:3000"
+    environment:
+      - DATABASE_URL=postgresql://changeuser:changepass@postgres:5432/change_dbname
+      - NEXTAUTH_URL=http://localhost:3080
+      - NEXTAUTH_SECRET=supersecret
+      - SALT=supersecret
+```
+
+**File:** `.env.example`
+
+Add the Langfuse keys that will be generated from the local UI:
+
+```bash
+# Langfuse Observability
+LANGFUSE_SECRET_KEY=sk-lf-...
+LANGFUSE_PUBLIC_KEY=pk-lf-...
+LANGFUSE_HOST=http://localhost:3080
+```
+
+### Step 5.2: Install Backend Dependencies
+
+In `server/package.json`, add the Langfuse LangChain integration:
+
+```bash
+npm install langfuse-langchain
+```
+
+### Step 5.3: Integrate Langfuse Callback
+
+**File:** `server/src/rag/chain.service.ts`
+
+Update the `chat` method to use the Langfuse callback handler for full trace visibility of retrieval and LLM generation.
+
+```typescript
+import { CallbackHandler } from 'langfuse-langchain';
+
+// ... inside ChainService ...
+
+  async chat(query: string, k: number = 4): Promise<ChatResponse> {
+    // Initialize Langfuse handler
+    const langfuseHandler = new CallbackHandler({
+      secretKey: process.env.LANGFUSE_SECRET_KEY,
+      publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+      baseUrl: process.env.LANGFUSE_HOST,
+    });
+
+    const embeddings = await this.getEmbeddings();
+    const retrievedChunks = await this.retrieverService.similaritySearch(
+      query,
+      k,
+      embeddings,
+    );
+
+    const llm = new ChatAnthropic({
+      model: this.config.llmConfig.model,
+      apiKey: this.config.llmConfig.apiKey,
+      temperature: 0,
+      callbacks: [langfuseHandler], // Attach callback to LLM
+    });
+
+    const prompt = PromptTemplate.fromTemplate(RAG_PROMPT);
+
+    const combineDocsChain = await createStuffDocumentsChain({
+      llm,
+      prompt,
+    });
+
+    const docs = retrievedChunks.map(
+      (chunk) =>
+        new (await import('@langchain/core/documents')).Document({
+          pageContent: chunk.content,
+          metadata: chunk.metadata,
+        }),
+    );
+
+    const result = await combineDocsChain.invoke(
+      {
+        input: query,
+        context: docs,
+      },
+      { callbacks: [langfuseHandler] } // Attach callback to the Chain
+    );
+
+    return {
+      answer: result,
+      sources: retrievedChunks.map((chunk) => ({
+        content: chunk.content,
+        source: chunk.metadata.sourceFile as string,
+        chunkIndex: chunk.metadata.chunkIndex as number,
+      })),
+    };
+  }
+```
+
+### Step 5.4: Langfuse UI Setup
+
+1. Run `docker-compose up -d`.
+2. Open `http://localhost:3080`.
+3. Create a default account (stored in the local PostgeSQL `change_dbname` database).
+4. Create a new "Project" in Langfuse.
+5. Go to Settings -> API Keys and generate new keys.
+6. Copy the `Secret Key` and `Public Key` into your backend `.env` file under `LANGFUSE_SECRET_KEY` and `LANGFUSE_PUBLIC_KEY`.
+7. Start the backend (`npm run start:dev`) and ask a question via the Chat UI.
+8. View the execution traces (retrieval time, LLM prompt generation, LLM completion time, and exact inputs/outputs) in the Langfuse dashboard.
+
+---
+
 ## Recommended Build Order
 
 1. **Update docker-compose.yml** → pgvector image
