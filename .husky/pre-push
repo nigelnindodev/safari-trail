@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+
+CHANGED=$(git diff --name-only main...HEAD)
+
+# Check for server changes
+if echo "$CHANGED" | grep -q "^server/"; then
+  echo "Server changes detected. Verifying build..."
+  npm run build:server || exit 1
+fi
+
+# Check for client changes
+if echo "$CHANGED" | grep -q "^client/"; then
+  echo "Client changes detected. Verifying build..."
+  npm run build:client || exit 1
+fi

@@ -1,0 +1,24 @@
+name: Client CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'client/**'
+      - '.github/workflows/client.yml'
+      - '.github/workflows/node-ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'client/**'
+      - '.github/workflows/client.yml'
+      - '.github/workflows/node-ci.yml'
+
+jobs:
+  ci:
+    name: Client CI
+    uses: ./.github/workflows/node-ci.yml
+    with:
+      working-directory: client
+      node-version: '22.x'
+      upload-artifacts: false 

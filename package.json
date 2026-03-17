@@ -1,0 +1,37 @@
+{
+  "name": "xborg",
+  "author": "Nigel Nindo",
+  "version": "1.0.0",
+  "scripts": {
+    "setup": "npm run setup:server && npm run setup:client",
+    "setup:server": "cd server && npm install",
+    "setup:client": "cd client && npm install",
+    "server:start": "cd server && npm start",
+    "client:start": "cd client && NODE_ENV=production npm start",
+    "lint:client": "cd client && npm run lint",
+    "lint:server": "cd server && npm run lint",
+    "build:client": "cd client && NODE_ENV=production npm run build",
+    "build:server": "cd server && npm run build",
+    "prepare": "husky"
+  },
+  "keywords": [],
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.0",
+    "ts-node": "^10.9.2"
+  },
+  "lint-staged": {
+    "client/**/*.{js,jsx,ts,tsx}": [
+      "npm run lint:client"
+    ],
+    "server/**/*.ts": [
+      "npm run lint:server"
+    ]
+  },
+  "dependencies": {
+    "axios": "^1.13.5"
+  }
+}

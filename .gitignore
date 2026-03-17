@@ -1,0 +1,21 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+*.swp
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Build outputs and dependencies
+/dist
+/node_modules
+/build
+/.next
+
+# All projects
+**/node_modules
+**/dist
+**/.env
+**/*.log
