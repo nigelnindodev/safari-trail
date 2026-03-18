@@ -102,8 +102,6 @@ services:
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_SERVER_BASE_URL: http://localhost:5000
-    volumes:
-      - ./mkdn_files:/app/mkdn_files:ro
 
 volumes:
   postgres_data:
