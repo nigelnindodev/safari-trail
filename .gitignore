@@ -15,7 +15,8 @@ Thumbs.db
 /.next
 
 # Project files
-plan.md
+plans/
+mkdn_files/
 
 # All projects
 **/node_modules

@@ -2,22 +2,81 @@ version: '3.8'
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg16
     restart: always
     environment:
       POSTGRES_USER: changeuser
       POSTGRES_PASSWORD: changepass
-      POSTGRES_DB: change_dbname
+      POSTGRES_DB: change_dbname_1
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   redis:
     image: redis:alpine
     restart: always
     ports:
-      - "6379:6379"
+      - '6379:6379'
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: always
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama_data:/root/.ollama
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    restart: always
+    environment:
+      - CLICKHOUSE_DB=langfuse
+      - CLICKHOUSE_USER=langfuse
+      - CLICKHOUSE_PASSWORD=langfuse_password
+    ports:
+      - '8123:8123'
+      - '9000:9000'
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./docker/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  langfuse:
+    image: langfuse/langfuse:latest
+    restart: always
+    depends_on:
+      - clickhouse
+      - postgres
+    ports:
+      - '3080:3000'
+    environment:
+      - NODE_ENV=production
+      - NEXTAUTH_URL=http://localhost:3080
+      - NEXTAUTH_SECRET=langfuse_nextauth_secret_change_me
+      - SALT=langfuse_salt_change_me
+      - DATABASE_URL=postgresql://changeuser:changepass@postgres:5432/langfuse_data
+      - LANGFUSE_ENCRYPTION_KEY=my-extremely-secure-32-char-key-123
+      # ClickHouse configuration (required for v3)
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://langfuse:langfuse_password@clickhouse:9000
+      - CLICKHOUSE_CLUSTER_ENABLED=false
+      - CLICKHOUSE_DB=langfuse
+      - CLICKHOUSE_USER=langfuse
+      - CLICKHOUSE_PASSWORD=langfuse_password
+      # Optional: Redis for caching (can use existing redis)
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - TELEMETRY_ENABLED=false
+      - LANGFUSE_INIT_PROJECT_ID=default
+      - LANGFUSE_INIT_PROJECT_NAME=Default
+      - LANGFUSE_INIT_ORG_ID=default
+      - LANGFUSE_INIT_ORG_NAME=Default
 
   server:
     build:
@@ -25,10 +84,12 @@ services:
       dockerfile: Dockerfile
     restart: always
     ports:
-      - "5000:5000"
+      - '5000:5000'
     depends_on:
       - postgres
       - redis
+      - ollama
+      - langfuse
     environment:
       NODE_ENV: development
       # Database
@@ -36,7 +97,7 @@ services:
       PG_PORT: 5432
       PG_USERNAME: changeuser
       PG_PASSWORD: changepass
-      PG_DATABASE: change_dbname
+      PG_DATABASE: change_dbname_1
       # Redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -51,6 +112,18 @@ services:
       # Client URL
       CLIENT_BASE_URL: http://localhost:3000
       SERVER_BASE_URL: http://localhost:5000
+      # RAG Configuration
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-768}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse:3000}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      NOTES_DIR: ${NOTES_DIR:-/app/mkdn_files}
+      VECTOR_TABLE_NAME: ${VECTOR_TABLE_NAME:-document_chunk}
+      VECTOR_DISTANCE_STRATEGY: ${VECTOR_DISTANCE_STRATEGY:-cosine}
 
   client:
     build:
@@ -60,12 +133,16 @@ services:
         NEXT_PUBLIC_SERVER_BASE_URL: http://localhost:5000
     restart: always
     ports:
-      - "3000:3000"
+      - '3000:3000'
     depends_on:
       - server
     environment:
       NODE_ENV: production
       NEXT_PUBLIC_SERVER_BASE_URL: http://localhost:5000
+    volumes:
+      - ./mkdn_files:/app/mkdn_files:ro
 
 volumes:
   postgres_data:
+  ollama_data:
+  clickhouse_data:
