@@ -28,31 +28,12 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
-  clickhouse:
-    image: clickhouse/clickhouse-server:latest
-    container_name: clickhouse
-    restart: always
-    environment:
-      - CLICKHOUSE_DB=langfuse
-      - CLICKHOUSE_USER=langfuse
-      - CLICKHOUSE_PASSWORD=langfuse_password
-    ports:
-      - '8123:8123'
-      - '9000:9000'
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
-      - ./docker/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
-
   langfuse:
-    image: langfuse/langfuse:latest
+    image: langfuse/langfuse:2
     restart: always
     depends_on:
-      - clickhouse
       - postgres
+      - redis
     ports:
       - '3080:3000'
     environment:
@@ -61,22 +42,9 @@ services:
       - NEXTAUTH_SECRET=langfuse_nextauth_secret_change_me
       - SALT=langfuse_salt_change_me
       - DATABASE_URL=postgresql://changeuser:changepass@postgres:5432/langfuse_data
-      - LANGFUSE_ENCRYPTION_KEY=my-extremely-secure-32-char-key-123
-      # ClickHouse configuration (required for v3)
-      - CLICKHOUSE_URL=http://clickhouse:8123
-      - CLICKHOUSE_MIGRATION_URL=clickhouse://langfuse:langfuse_password@clickhouse:9000
-      - CLICKHOUSE_CLUSTER_ENABLED=false
-      - CLICKHOUSE_DB=langfuse
-      - CLICKHOUSE_USER=langfuse
-      - CLICKHOUSE_PASSWORD=langfuse_password
-      # Optional: Redis for caching (can use existing redis)
+      - TELEMETRY_ENABLED=false
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - TELEMETRY_ENABLED=false
-      - LANGFUSE_INIT_PROJECT_ID=default
-      - LANGFUSE_INIT_PROJECT_NAME=Default
-      - LANGFUSE_INIT_ORG_ID=default
-      - LANGFUSE_INIT_ORG_NAME=Default
 
   server:
     build:
@@ -92,33 +60,28 @@ services:
       - langfuse
     environment:
       NODE_ENV: development
-      # Database
       PG_HOST: postgres
       PG_PORT: 5432
       PG_USERNAME: changeuser
       PG_PASSWORD: changepass
+      # --- CONTINUES: Uses the main app database ---
       PG_DATABASE: change_dbname_1
-      # Redis
+      # ---------------------------------------------
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      # App
       HTTP_PORT: 5000
       JWT_SECRET: ${JWT_SECRET:-supersecret}
-      # Google OAuth (Required)
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
-      # Encryption Keys (Required JSON format)
       ENCRYPTION_KEYS: ${ENCRYPTION_KEYS}
-      # Client URL
       CLIENT_BASE_URL: http://localhost:3000
       SERVER_BASE_URL: http://localhost:5000
-      # RAG Configuration
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-ollama}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
       EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-768}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse:3000}
+      LANGFUSE_HOST: http://langfuse:3000
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       NOTES_DIR: ${NOTES_DIR:-/app/mkdn_files}
@@ -145,4 +108,3 @@ services:
 volumes:
   postgres_data:
   ollama_data:
-  clickhouse_data:
