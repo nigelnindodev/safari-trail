@@ -21,12 +21,14 @@ services:
       - '6379:6379'
 
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.18.1
     restart: always
     ports:
       - '11434:11434'
     volumes:
       - ollama_data:/root/.ollama
+      - ./docker/ollama/entrypoint.sh:/entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
 
   langfuse:
     image: langfuse/langfuse:2
