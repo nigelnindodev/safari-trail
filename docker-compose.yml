@@ -87,6 +87,8 @@ services:
       NOTES_DIR: ${NOTES_DIR:-/app/mkdn_files}
       VECTOR_TABLE_NAME: ${VECTOR_TABLE_NAME:-document_chunk}
       VECTOR_DISTANCE_STRATEGY: ${VECTOR_DISTANCE_STRATEGY:-cosine}
+    volumes:
+      - ./mkdn_files:/app/mkdn_files:ro
 
   client:
     build:
