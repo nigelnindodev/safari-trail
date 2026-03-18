@@ -2,4 +2,4 @@
 CREATE EXTENSION IF NOT EXISTS "vector";
 
 -- Create the Langfuse specific DB
-CREATE DATABASE langfuse_data;
+CREATE DATABASE IF NOT EXISTS langfuse_data;
